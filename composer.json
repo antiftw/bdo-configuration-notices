@@ -10,23 +10,59 @@
         }
     ],
     "require": {
-        "php": ">=7.2.9"
+        "php": "^8.1"
     },
     "require-dev": {
-        "bolt/core": "^5.2",
-        "symplify/easy-coding-standard": "^8.3"
+        "bolt/core": "dev-5.2.0-rc.2",
+        "symplify/easy-coding-standard": "^12.2"
     },
     "autoload": {
         "psr-4": {
             "BobdenOtter\\ConfigurationNotices\\": "src/"
         }
     },
-    "minimum-stability": "beta",
+    "minimum-stability": "dev",
     "prefer-stable": true,
     "extra": {
         "entrypoint": "BobdenOtter\\ConfigurationNotices\\Extension",
         "screenshots": [
             "screenshots/notices.png"
         ]
+    },
+    "repositories": {
+        "antiftw-bolt-core": {
+            "type": "vcs",
+            "url": "https://github.com/antiftw/bolt-core"
+        },
+        "jfsenechal_doctrine_behaviors": {
+            "type": "vcs",
+            "url": "git@github.com:jfsenechal/DoctrineBehaviors.git"
+        },
+        "antiftw-yaml-migrations": {
+            "type": "vcs",
+            "url": "https://github.com/antiftw/bdo-yaml-migrations"
+        },
+        "antiftw-php-translation-symfony-bundle": {
+            "type": "vcs",
+            "url": "https://github.com/antiftw/php-translation-symfony-bundle"
+        },
+        "antiftw-php-translation-extractor": {
+            "type": "vcs",
+            "url": "https://github.com/antiftw/php-translation-extractor"
+        },
+        "antiftw-php-translation-loco-adapter": {
+            "type": "vcs",
+            "url": "https://github.com/antiftw/php-translation-loco-adapter"
+        },
+        "antiftw-bolt-reference-extension": {
+            "type": "vcs",
+            "url": "https://github.com/antiftw/bolt-reference-extension"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "symfony/flex": true,
+            "drupol/composer-packages": true
+        }
     }
 }

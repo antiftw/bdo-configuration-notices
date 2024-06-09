@@ -8,52 +8,41 @@ use Bolt\Configuration\Config;
 use Bolt\Extension\BaseExtension;
 use Bolt\Repository\FieldRepository;
 use ComposerPackages\Packages;
-use Symfony\Component\DependencyInjection\Container;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
-use Tightenco\Collect\Support\Collection;
+use Illuminate\Support\Collection;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class Checks
 {
-    protected $defaultDomainPartials = ['.dev', 'dev.', 'devel.', 'development.', 'test.', '.test', 'new.', '.new', '.local', 'local.', '.wip', 'localhost'];
+    protected array $defaultDomainPartials = ['.dev', 'dev.', 'devel.', 'development.', 'test.', '.test', 'new.', '.new', '.local', 'local.', '.wip', 'localhost'];
+    private Config $boltConfig;
+    private Request $request;
+    private Collection $extensionConfig;
 
-    /** @var Config */
-    private $boltConfig;
+    private array$notices = [];
+    private int $severity = 0;
+    private ContainerInterface $container;
+    private FieldRepository $fieldRepository;
 
-    /** @var Request */
-    private $request;
-
-    /** @var Collection */
-    private $extensionConfig;
-
-    private $notices = [];
-    private $severity = 0;
-
-    /** @var Container */
-    private $container;
-
-    /** @var BaseExtension */
-    private $extension;
-
-    /** @var FieldRepository */
-    private $fieldRepository;
-
-    private $levels = [
+    private array $levels = [
         1 => 'info',
         2 => 'warning',
         3 => 'danger',
     ];
 
-    private $generalForbiddenFieldNames = [
+    private array $generalForbiddenFieldNames = [
         'id',
         'definitionfromcontenttypeconfig',
         'twig',
-        'definiiton',
+        'definition',
         'icon',
         'author',
         'status',
@@ -69,7 +58,7 @@ class Checks
         'array',
     ];
 
-    private $setForbiddenFieldNames = [
+    private array $setForbiddenFieldNames = [
         'id',
         'definition',
         'name',
@@ -88,15 +77,14 @@ class Checks
         'contentselect',
     ];
 
-    private $client = null;
+    private ?HttpClientInterface $client = null;
 
-    public function __construct(BaseExtension $extension)
+    public function __construct(private readonly BaseExtension $extension)
     {
         $this->boltConfig = $extension->getBoltConfig();
         $this->request = $extension->getRequest();
         $this->extensionConfig = $extension->getConfig();
         $this->container = $extension->getContainer();
-        $this->extension = $extension;
         $this->fieldRepository = $extension->getService(FieldRepository::class);
     }
 
@@ -397,14 +385,14 @@ class Checks
     }
 
     /**
-     * Check whether or not we're running on a hostname without TLD, like 'http://localhost'.
+     * Check whether we're running on a hostname without TLD, like 'http://localhost'.
      */
     private function singleHostnameCheck(): void
     {
         $hostname = $this->request->getHttpHost();
 
         if (mb_strpos($hostname, '.') === false) {
-            $notice = "You are using <code>{$hostname}</code> as host name. Some browsers have problems with sessions on hostnames that do not have a <code>.tld</code> in them.";
+            $notice = "You are using <code>$hostname</code> as host name. Some browsers have problems with sessions on hostnames that do not have a <code>.tld</code> in them.";
             $info = 'If you experience difficulties logging on, either configure your webserver to use a hostname with a dot in it, or use another browser.';
 
             $this->setNotice(1, $notice, $info);
@@ -412,14 +400,14 @@ class Checks
     }
 
     /**
-     * Check whether or not we're running on a hostname without TLD, like 'http://localhost'.
+     * Check whether we're running on a hostname without TLD, like 'http://localhost'.
      */
     private function ipAddressCheck(): void
     {
         $hostname = $this->request->getHttpHost();
 
         if (filter_var($hostname, FILTER_VALIDATE_IP)) {
-            $notice = "You are using the <strong>IP address</strong> <code>{$hostname}</code> as host name. This is known to cause problems with sessions on certain browsers.";
+            $notice = "You are using the <strong>IP address</strong> <code>$hostname</code> as host name. This is known to cause problems with sessions on certain browsers.";
             $info = 'If you experience difficulties logging on, either configure your webserver to use a proper hostname, or use another browser.';
 
             $this->setNotice(1, $notice, $info);
@@ -495,7 +483,7 @@ class Checks
         if ($hostname['scheme'] !== $_SERVER['CANONICAL_SCHEME'] || $hostname['host'] !== $_SERVER['CANONICAL_HOST']) {
             $canonical = sprintf('%s://%s', $_SERVER['CANONICAL_SCHEME'], $_SERVER['CANONICAL_HOST']);
             $login = sprintf('%s%s', $canonical, $this->getParameter('bolt.backend_url'));
-            $notice = "The <strong>canonical hostname</strong> is set to <code>{$canonical}</code> in <code>config.yaml</code>,
+            $notice = "The <strong>canonical hostname</strong> is set to <code>$canonical</code> in <code>config.yaml</code>,
                 but you are currently logged in using another hostname. This might cause issues with uploaded files, or
                 links inserted in the content.";
             $info = sprintf(
@@ -515,21 +503,21 @@ class Checks
     {
         if (! extension_loaded('exif') || ! function_exists('exif_read_data')) {
             $notice = 'The function <code>exif_read_data</code> does not exist, which means that Bolt can not create thumbnail images.';
-            $info = "Make sure the <code>php-exif</code> extension is enabled <u>and</u> compiled into your PHP setup. See <a href='http://php.net/manual/en/exif.installation.php'>here</a>.";
+            $info = "Make sure the <code>php-exif</code> extension is enabled <u>and</u> compiled into your PHP setup. See <a href='https://php.net/manual/en/exif.installation.php'>here</a>.";
 
             $this->setNotice(1, $notice, $info);
         }
 
         if (! extension_loaded('fileinfo') || ! class_exists('finfo')) {
             $notice = 'The class <code>finfo</code> does not exist, which means that Bolt can not create thumbnail images.';
-            $info = "Make sure the <code>fileinfo</code> extension is enabled <u>and</u> compiled into your PHP setup. See <a href='http://php.net/manual/en/fileinfo.installation.php'>here</a>.";
+            $info = "Make sure the <code>fileinfo</code> extension is enabled <u>and</u> compiled into your PHP setup. See <a href='https://php.net/manual/en/fileinfo.installation.php'>here</a>.";
 
             $this->setNotice(1, $notice, $info);
         }
 
         if (! extension_loaded('gd') || ! function_exists('gd_info')) {
             $notice = 'The function <code>gd_info</code> does not exist, which means that Bolt can not create thumbnail images.';
-            $info = "Make sure the <code>gd</code> extension is enabled <u>and</u> compiled into your PHP setup. See <a href='http://php.net/manual/en/image.installation.php'>here</a>.";
+            $info = "Make sure the <code>gd</code> extension is enabled <u>and</u> compiled into your PHP setup. See <a href='https://php.net/manual/en/image.installation.php'>here</a>.";
 
             $this->setNotice(1, $notice, $info);
         }
@@ -569,7 +557,7 @@ class Checks
     {
         if ($this->boltConfig->get('general/maintenance_mode', false)) {
             $notice = "Bolt's <strong>maintenance mode</strong> is enabled. This means that non-authenticated users will not be able to see the website.";
-            $info = 'To make the site available to the general public again, set <code>maintenance_mode: false</code> in your <code>config.yaml</code> file.';
+            $info = 'To make the site available to the public again, set <code>maintenance_mode: false</code> in your <code>config.yaml</code> file.';
 
             $this->setNotice(1, $notice, $info);
         }
@@ -588,7 +576,7 @@ class Checks
 
         foreach ($checkServices as $key => $service) {
             if (! $availableServices->contains($service['name'])) {
-                $notice = "Bolt's <code>services.yaml</code> is missing the <code>{$key}</code>. This needs to be added in order to function correctly.";
+                $notice = "Bolt's <code>services.yaml</code> is missing the <code>$key</code>. This needs to be added in order to function correctly.";
                 $info = 'To remedy this, edit <code>services.yaml</code> in the <code>config</code> folder and add the following:';
                 $info .= '<pre>' . $service['code'] . '</pre>';
 
@@ -682,13 +670,13 @@ class Checks
         return true;
     }
 
-    private function isReachable(string $relativeUrl)
+    private function isReachable(string $relativeUrl): bool
     {
         if (! $this->client) {
             $this->client = HttpClient::create();
         }
 
-        $url = $this->container->get('router')->generate('homepage', [], RouterInterface::ABSOLUTE_URL) . $relativeUrl;
+        $url = $this->container->get('router')->generate('homepage', [], UrlGeneratorInterface::ABSOLUTE_URL) . $relativeUrl;
         $response = $this->client->request('GET', $url);
 
         try {
@@ -716,10 +704,7 @@ class Checks
         ];
     }
 
-    /**
-     * @return string|bool|null
-     */
-    private function getParameter(string $parameter)
+    private function getParameter(string $parameter): bool|string|null
     {
         return $this->container->getParameter($parameter);
     }
